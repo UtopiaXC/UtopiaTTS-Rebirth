@@ -28,6 +28,8 @@ class UtopiaTtsService : TextToSpeechService() {
     private lateinit var ttsEngineManager: TtsEngineManager
     private lateinit var preferenceManager: PreferenceManager
     private var allVoices: List<VoiceInfo> = emptyList()
+    @Volatile
+    private var activeQueue: java.util.concurrent.LinkedBlockingQueue<SynthesisEvent>? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -212,6 +214,8 @@ class UtopiaTtsService : TextToSpeechService() {
 
     override fun onStop() {
         ttsEngineManager.getCurrentEngine().stop()
+        activeQueue?.offer(SynthesisEvent.Done)
+        activeQueue = null
     }
 
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
@@ -271,7 +275,8 @@ class UtopiaTtsService : TextToSpeechService() {
 
         Log.d(TAG, "Synthesizing text: \"$text\" using voice: ${voice.name}, speed: $speed, pitch: $pitch")
 
-        var isStarted = false
+        val queue = java.util.concurrent.LinkedBlockingQueue<SynthesisEvent>()
+        activeQueue = queue
         val outputFormat = "raw-24khz-16bit-mono-pcm"
 
         ttsEngineManager.getCurrentEngine().synthesize(
@@ -283,34 +288,91 @@ class UtopiaTtsService : TextToSpeechService() {
             outputFormat = outputFormat,
             callback = object : TtsSynthesisCallback {
                 override fun onStart() {
-                    callback.start(24000, AudioFormat.ENCODING_PCM_16BIT, 1)
-                    isStarted = true
+                    queue.offer(SynthesisEvent.Start)
                 }
 
                 override fun onAudioAvailable(audioData: ByteArray) {
+                    queue.offer(SynthesisEvent.Audio(audioData))
+                }
+
+                override fun onDone() {
+                    queue.offer(SynthesisEvent.Done)
+                }
+
+                override fun onError(error: String) {
+                    queue.offer(SynthesisEvent.Error(error))
+                }
+            }
+        )
+
+        var isStarted = false
+        var running = true
+        while (running) {
+            val event = try {
+                queue.poll(30, java.util.concurrent.TimeUnit.SECONDS)
+            } catch (e: InterruptedException) {
+                Log.e(TAG, "Synthesis loop interrupted", e)
+                if (isStarted) callback.error()
+                break
+            }
+
+            if (event == null) {
+                Log.e(TAG, "Synthesis timed out waiting for events")
+                if (isStarted) callback.error()
+                break
+            }
+
+            when (event) {
+                is SynthesisEvent.Start -> {
                     if (!isStarted) {
-                        callback.start(24000, AudioFormat.ENCODING_PCM_16BIT, 1)
+                        val startResult = callback.start(24000, AudioFormat.ENCODING_PCM_16BIT, 1)
+                        if (startResult != TextToSpeech.SUCCESS) {
+                            Log.e(TAG, "SynthesisCallback.start() returned error: $startResult")
+                            ttsEngineManager.getCurrentEngine().stop()
+                            running = false
+                        } else {
+                            isStarted = true
+                        }
+                    }
+                }
+                is SynthesisEvent.Audio -> {
+                    if (!isStarted) {
+                        val startResult = callback.start(24000, AudioFormat.ENCODING_PCM_16BIT, 1)
+                        if (startResult != TextToSpeech.SUCCESS) {
+                            Log.e(TAG, "SynthesisCallback.start() returned error: $startResult")
+                            ttsEngineManager.getCurrentEngine().stop()
+                            running = false
+                            continue
+                        }
                         isStarted = true
                     }
+                    val audioData = event.data
                     val maxBufferSize = callback.maxBufferSize
                     var offset = 0
                     while (offset < audioData.size) {
                         val length = Math.min(audioData.size - offset, maxBufferSize)
-                        callback.audioAvailable(audioData, offset, length)
+                        val writeResult = callback.audioAvailable(audioData, offset, length)
+                        if (writeResult != TextToSpeech.SUCCESS) {
+                            Log.e(TAG, "SynthesisCallback.audioAvailable() returned error: $writeResult")
+                            ttsEngineManager.getCurrentEngine().stop()
+                            running = false
+                            break
+                        }
                         offset += length
                     }
                 }
-
-                override fun onDone() {
-                    callback.done()
+                is SynthesisEvent.Done -> {
+                    if (isStarted) callback.done()
+                    running = false
                 }
-
-                override fun onError(error: String) {
-                    Log.e(TAG, "Synthesis error: $error")
-                    callback.error()
+                is SynthesisEvent.Error -> {
+                    Log.e(TAG, "Synthesis error: ${event.message}")
+                    if (isStarted) callback.error()
+                    running = false
                 }
             }
-        )
+        }
+        activeQueue = null
     }
 
     private fun getSelectedVoice(voices: List<VoiceInfo>): VoiceInfo? {
@@ -334,4 +396,11 @@ class UtopiaTtsService : TextToSpeechService() {
         }
         return null
     }
+}
+
+private sealed class SynthesisEvent {
+    object Start : SynthesisEvent()
+    class Audio(val data: ByteArray) : SynthesisEvent()
+    object Done : SynthesisEvent()
+    class Error(val message: String) : SynthesisEvent()
 }

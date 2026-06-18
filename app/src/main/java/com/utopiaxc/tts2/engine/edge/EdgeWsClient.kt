@@ -13,9 +13,10 @@ class EdgeWsClient {
     companion object {
         private const val TAG = "EdgeWsClient"
         internal val client = OkHttpClient.Builder()
-            .readTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
-            .connectTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .pingInterval(5, TimeUnit.SECONDS)
             .build()
     }
 
@@ -138,8 +139,6 @@ class EdgeWsClient {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (isStopped) return
-                
                 val builder = StringBuilder()
                 builder.append("WebSocket failure: ").append(t.message).append("\n")
                 if (response != null) {
@@ -163,6 +162,10 @@ class EdgeWsClient {
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 webSocket.close(1000, null)
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.d(TAG, "WebSocket closed: code=$code, reason=$reason")
             }
         })
     }
