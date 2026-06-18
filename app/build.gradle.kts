@@ -28,14 +28,12 @@ android {
             val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH") ?: "upload-keystore.jks"
             val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
             val keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: ""
-            val keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+            val keyPassword = System.getenv("ANDROID_KEY_PASSWORD").takeIf { !it.isNullOrEmpty() } ?: keystorePassword
 
-            if (keystorePassword.isNotEmpty()) {
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            }
+            storeFile = file(keystorePath)
+            storePassword = keystorePassword
+            this.keyAlias = keyAlias
+            this.keyPassword = keyPassword
         }
     }
 
@@ -44,10 +42,7 @@ android {
             optimization {
                 enable = false
             }
-            val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
-            if (keystorePassword.isNotEmpty()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
