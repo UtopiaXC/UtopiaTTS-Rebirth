@@ -1,0 +1,61 @@
+<resources>
+    <string name="app_name">UtopiaTTS Rebirth</string>
+    <string name="tab_config">Voice</string>
+    <string name="tab_synthesis">Synthesize</string>
+    <string name="tab_settings">Settings</string>
+    
+    <string name="engine_source">TTS Engine Source</string>
+    <string name="language_filter">Language Filter</string>
+    <string name="select_voice">Select Voice</string>
+    
+    <string name="speed_rate">Speed (Rate): %s</string>
+    <string name="voice_pitch">Pitch: %s</string>
+    <string name="voice_volume">Volume: %s</string>
+    
+    <string name="btn_preview">Preview Voice</string>
+    <string name="preview_default_text">This is an example of speech synthesis.</string>
+    
+    <string name="input_hint">Enter your text here to synthesize speech...</string>
+    <string name="btn_synthesize">Synthesize to File</string>
+    
+    <string name="btn_playing">Playing...</string>
+    <string name="btn_play">Play Audio</string>
+    <string name="btn_pause">Pause</string>
+    <string name="btn_stop">Stop</string>
+    <string name="btn_save">Save Audio</string>
+    
+    <string name="synthesis_success">Synthesis complete!</string>
+    <string name="synthesis_failed">Synthesis failed: %s</string>
+    <string name="save_success">Audio saved to Downloads: %s</string>
+    <string name="save_failed">Failed to save audio: %s</string>
+    <string name="network_unavailable">Network unavailable. Please check your connection.</string>
+    
+    <string name="settings_about_title">About</string>
+    <string name="settings_about_summary">Version 1.0.0</string>
+    <string name="settings_credentials_title">Credentials</string>
+    <string name="credentials_reminder">Note: Credentials are only required when using the Microsoft Azure SDK engine source.</string>
+    <string name="about_description">UtopiaTTS is a software designed to replace the system\'s TTS engine and can be used for audiobook listening on some third-party novel reading apps.</string>
+    <string name="about_developer">Developer</string>
+    <string name="about_developer_name">UtopiaXC</string>
+    <string name="about_github">GitHub Repository</string>
+    <string name="about_github_url">https://github.com/UtopiaXC/UtopiaTTS-Rebirth</string>
+    <string name="about_license">Open Source License</string>
+    <string name="about_license_text">MIT</string>
+    
+    <string name="status_idle">Ready</string>
+    <string name="status_loading_voices">Downloading voice list...</string>
+    <string name="status_synthesizing">Synthesizing...</string>
+    <string name="gender_female">Female</string>
+    <string name="gender_male">Male</string>
+    
+    <string name="about_card_title">UtopiaTTS Rebirth</string>
+    <string name="about_card_subtitle">System-Level TTS Engine</string>
+    
+    <string name="azure_config_title">Azure SDK Configuration</string>
+    <string name="azure_key_hint">Azure Subscription Key (API Key)</string>
+    <string name="azure_region_hint">Azure Service Region (e.g. eastus)</string>
+    <string name="btn_save_config">Save Configuration</string>
+    <string name="azure_config_saved">Azure SDK configuration saved successfully.</string>
+    <string name="azure_config_empty">API Key and Region cannot be empty.</string>
+    <string name="settings_system_settings">System Settings</string>
+</resources>
