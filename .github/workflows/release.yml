@@ -79,14 +79,24 @@ jobs:
       - name: Rename and Collect APKs
         run: |
           mkdir -p out
-          if [ -f app/build/outputs/apk/release/app-universal-release.apk ]; then
-            cp app/build/outputs/apk/release/app-universal-release.apk out/UtopiaTTS-${VERSION_NAME}-Android-universal.apk
+          shopt -s nullglob
+          apks=(app/build/outputs/apk/release/app-*.apk)
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No APKs found in release directory!"
+            exit 1
           fi
-          for apk in app/build/outputs/apk/release/app-*-release.apk; do
+          for apk in "${apks[@]}"; do
             filename=$(basename "$apk")
-            if [ "$filename" != "app-universal-release.apk" ]; then
-              abi=$(echo "$filename" | sed 's/app-\(.*\)-release\.apk/\1/')
-              cp "$apk" "out/UtopiaTTS-${VERSION_NAME}-Android-${abi}.apk"
+            suffix=""
+            if [[ "$filename" == *"-unsigned.apk" ]]; then
+              suffix="-unsigned"
+            fi
+            if [[ "$filename" == *"app-universal-release"* ]]; then
+              cp "$apk" "out/UtopiaTTS-${VERSION_NAME}-Android-universal${suffix}.apk"
+            else
+              abi=${filename#app-}
+              abi=${abi%-release*}
+              cp "$apk" "out/UtopiaTTS-${VERSION_NAME}-Android-${abi}${suffix}.apk"
             fi
           done
       - uses: actions/upload-artifact@v4
