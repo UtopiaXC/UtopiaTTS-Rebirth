@@ -37,5 +37,15 @@ Xperia 1 Ⅱ 开源阅读
 如果您想捐助本项目，您可以向慈善组织或开放源代码促进会（开源组织，OSI）捐款，我们会感激不尽。  
 
 # 演示视频
+演示使用文石Leaf5电子书录制，部分UI可能由于电子书系统强制修改导致和普通安卓设备不一致，请以具体平台内显示为准。  
 ## 第三方APP调用
+
+
+https://github.com/user-attachments/assets/8715ef40-4735-474d-a957-88ba90c8d4d9
+
+
 ## APP内合成
+
+
+https://github.com/user-attachments/assets/036aea87-0fdf-4c37-85af-379115565ab9
+
