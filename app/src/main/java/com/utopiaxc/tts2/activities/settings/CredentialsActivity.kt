@@ -1,8 +1,9 @@
-package com.utopiaxc.tts2
+package com.utopiaxc.tts2.activities.settings
 
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.utopiaxc.tts2.R
 import com.utopiaxc.tts2.databinding.ActivityCredentialsBinding
 import com.utopiaxc.tts2.engine.azure.AzureConfig
 

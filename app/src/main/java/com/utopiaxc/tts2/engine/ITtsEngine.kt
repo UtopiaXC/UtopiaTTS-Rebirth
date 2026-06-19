@@ -14,6 +14,7 @@ interface ITtsEngine {
         pitch: Float,
         volume: Float,
         outputFormat: String = "audio-24khz-48kbitrate-mono-mp3",
+        isSsml: Boolean = false,
         callback: TtsSynthesisCallback
     )
     fun stop()

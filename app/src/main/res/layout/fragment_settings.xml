@@ -75,6 +75,49 @@
                 android:layout_height="1dp"
                 android:background="@color/divider_color" />
 
+            <!-- In-App Speech Synthesis Item -->
+            <LinearLayout
+                android:id="@+id/itemInAppTtsSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_settings_synthesis"
+                    app:tint="?attr/colorPrimary"
+                    android:layout_marginEnd="16dp"
+                    android:contentDescription="In-App Speech Synthesis Icon"/>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="APP内语音合成"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider_color" />
+
             <!-- About Item -->
             <LinearLayout
                 android:id="@+id/itemAbout"

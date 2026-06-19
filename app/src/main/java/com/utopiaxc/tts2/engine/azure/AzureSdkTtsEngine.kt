@@ -86,6 +86,7 @@ class AzureSdkTtsEngine(private val context: Context) : ITtsEngine {
         pitch: Float,
         volume: Float,
         outputFormat: String,
+        isSsml: Boolean,
         callback: TtsSynthesisCallback
     ) {
         val key = AzureConfig.getSubscriptionKey(context)
@@ -114,24 +115,28 @@ class AzureSdkTtsEngine(private val context: Context) : ITtsEngine {
 
                 callback.onStart()
 
-                val ratePercent = Math.round((speed - 1.0f) * 100)
-                val rateStr = (if (ratePercent >= 0) "+" else "") + ratePercent.toString() + "%"
+                val ssml = if (isSsml) {
+                    sanitizeSsml(text, voice.name, voice.locale)
+                } else {
+                    val ratePercent = Math.round((speed - 1.0f) * 100)
+                    val rateStr = (if (ratePercent >= 0) "+" else "") + ratePercent.toString() + "%"
+                    
+                    val pitchPercent = Math.round((pitch - 1.0f) * 100)
+                    val pitchStr = (if (pitchPercent >= 0) "+" else "") + pitchPercent.toString() + "%"
+                    
+                    val volumePercent = Math.round(volume * 100)
+                    val volumeStr = volumePercent.toString() + "%"
+                    
+                    val escapedText = escapeXml(text)
 
-                val pitchPercent = Math.round((pitch - 1.0f) * 100)
-                val pitchStr = (if (pitchPercent >= 0) "+" else "") + pitchPercent.toString() + "%"
-
-                val volumePercent = Math.round(volume * 100)
-                val volumeStr = volumePercent.toString() + "%"
-
-                val escapedText = escapeXml(text)
-
-                val ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${voice.locale}'>" +
-                        "<voice name='${voice.name}'>" +
-                        "<prosody pitch='$pitchStr' rate='$rateStr' volume='$volumeStr'>" +
-                        escapedText +
-                        "</prosody>" +
-                        "</voice>" +
-                        "</speak>"
+                    "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${voice.locale}'>" +
+                            "<voice name='${voice.name}'>" +
+                            "<prosody pitch='$pitchStr' rate='$rateStr' volume='$volumeStr'>" +
+                            escapedText +
+                            "</prosody>" +
+                            "</voice>" +
+                            "</speak>"
+                }
 
                 Log.d(TAG, "Synthesizing with Azure SDK: $ssml")
                 val currentResult = synthesizer.SpeakSsmlAsync(ssml).get()
@@ -182,6 +187,31 @@ class AzureSdkTtsEngine(private val context: Context) : ITtsEngine {
 
     override fun isAvailable(): Boolean {
         return AzureConfig.isConfigured(context)
+    }
+
+    private fun sanitizeSsml(ssml: String, voiceName: String, locale: String): String {
+        var result = ssml.trim()
+        val speakIndex = result.indexOf("<speak", ignoreCase = true)
+        if (speakIndex != -1) {
+            val tagEndIndex = result.indexOf(">", speakIndex)
+            if (tagEndIndex != -1) {
+                val tagContent = result.substring(speakIndex, tagEndIndex)
+                if (!tagContent.contains("xml:lang", ignoreCase = true)) {
+                    val restOfSsml = result.substring(tagEndIndex + 1)
+                    result = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='$locale'>" + restOfSsml
+                }
+            }
+        }
+        val voiceRegex = Regex("(?i)<voice([^>]*)>")
+        result = voiceRegex.replace(result) { matchResult ->
+            val attrs = matchResult.groupValues[1]
+            if (!attrs.contains("name=", ignoreCase = true)) {
+                "<voice$attrs name=\"$voiceName\">"
+            } else {
+                matchResult.value
+            }
+        }
+        return result
     }
 
     private fun escapeXml(s: String): String {

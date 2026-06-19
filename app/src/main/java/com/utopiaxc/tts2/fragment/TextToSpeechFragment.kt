@@ -1,5 +1,6 @@
 package com.utopiaxc.tts2.fragment
 
+import android.content.Context
 import android.content.ContentValues
 import android.os.Build
 import android.os.Bundle
@@ -9,7 +10,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import com.utopiaxc.tts2.MainActivity
 import com.utopiaxc.tts2.R
 import com.utopiaxc.tts2.databinding.FragmentTextToSpeechBinding
 import com.utopiaxc.tts2.engine.TtsEngineManager
@@ -17,6 +20,7 @@ import com.utopiaxc.tts2.engine.TtsEngineType
 import com.utopiaxc.tts2.engine.callback.TtsSynthesisCallback
 import com.utopiaxc.tts2.engine.callback.VoiceListCallback
 import com.utopiaxc.tts2.engine.model.VoiceInfo
+import com.utopiaxc.tts2.storage.HistoryManager
 import com.utopiaxc.tts2.storage.PreferenceManager
 import com.utopiaxc.tts2.util.AudioPlayerHelper
 import com.utopiaxc.tts2.util.NetworkUtils
@@ -40,6 +44,25 @@ class TextToSpeechFragment : Fragment() {
 
     private val audioOutputStream = ByteArrayOutputStream()
 
+    private var lastNormalText = ""
+    private var lastSsmlText = ""
+
+    private val importFileLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            try {
+                val inputStream = requireContext().contentResolver.openInputStream(uri)
+                val text = inputStream?.bufferedReader()?.use { it.readText() }
+                if (text != null) {
+                    binding.etInput.setText(text)
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "Failed to read file: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -57,7 +80,32 @@ class TextToSpeechFragment : Fragment() {
         audioPlayerHelper = AudioPlayerHelper(requireContext())
 
         setupButtons()
+        setupSsmlSwitch()
         loadVoiceList()
+
+        binding.root.setOnClickListener {
+            binding.etInput.clearFocus()
+            hideKeyboard(binding.etInput)
+        }
+
+        binding.etInput.setOnFocusChangeListener { v, hasFocus ->
+            if (!hasFocus) {
+                hideKeyboard(v)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (activity as? MainActivity)?.onImportFileClickListener = {
+            importFileLauncher.launch("text/*")
+        }
+        loadVoiceList()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        (activity as? MainActivity)?.onImportFileClickListener = null
     }
 
     private fun loadVoiceList() {
@@ -71,6 +119,24 @@ class TextToSpeechFragment : Fragment() {
 
             override fun onError(error: Throwable) {}
         })
+    }
+
+    private fun setupSsmlSwitch() {
+        binding.switchSsml.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                lastNormalText = binding.etInput.text.toString()
+                val activeVoiceId = preferenceManager.selectedVoiceId.ifEmpty { "zh-CN-XiaoxiaoNeural" }
+                val defaultSsml = """<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
+    <voice name="$activeVoiceId">
+        在此输入要合成的 SSML 内容...
+    </voice>
+</speak>"""
+                binding.etInput.setText(lastSsmlText.ifEmpty { defaultSsml })
+            } else {
+                lastSsmlText = binding.etInput.text.toString()
+                binding.etInput.setText(lastNormalText)
+            }
+        }
     }
 
     private fun setupButtons() {
@@ -136,6 +202,9 @@ class TextToSpeechFragment : Fragment() {
             return
         }
 
+        hideKeyboard(binding.etInput)
+        binding.etInput.clearFocus()
+
         val selectedVoiceId = preferenceManager.selectedVoiceId
         val voice = allVoices.find { it.id == selectedVoiceId } ?: VoiceInfo(
             id = selectedVoiceId.ifEmpty { "zh-CN-XiaoxiaoNeural" },
@@ -163,12 +232,16 @@ class TextToSpeechFragment : Fragment() {
         binding.tvStatusInfo.text = getString(R.string.status_synthesizing)
         binding.layoutPlayerControls.visibility = View.GONE
 
+        val isSsml = binding.switchSsml.isChecked
+
         ttsEngineManager.getCurrentEngine().synthesize(
             text = text,
             voice = voice,
             speed = preferenceManager.speed,
             pitch = preferenceManager.pitch,
             volume = preferenceManager.volume,
+            outputFormat = "audio-24khz-48kbitrate-mono-mp3",
+            isSsml = isSsml,
             callback = object : TtsSynthesisCallback {
                 override fun onStart() {
                     activity?.runOnUiThread {
@@ -182,26 +255,62 @@ class TextToSpeechFragment : Fragment() {
 
                 override fun onDone() {
                     activity?.runOnUiThread {
-                        synthesizedBytes = audioOutputStream.toByteArray()
+                        val bytes = audioOutputStream.toByteArray()
+                        synthesizedBytes = bytes
                         isSynthesizing = false
                         binding.btnSynthesize.text = getString(R.string.btn_synthesize)
                         binding.cardStatus.visibility = View.GONE
                         binding.layoutPlayerControls.visibility = View.VISIBLE
                         binding.btnPlayPause.text = getString(R.string.btn_play)
+
+                        // Save to history
+                        val currentEngineType = ttsEngineManager.getCurrentEngine().getType()
+                        val engineName = if (currentEngineType == TtsEngineType.AZURE_SDK) "Microsoft TTS (Azure SDK)" else "Microsoft TTS (Free)"
+                        HistoryManager.getInstance(requireContext()).addRecord(
+                            text = text,
+                            audioData = bytes,
+                            voiceId = voice.id,
+                            speed = preferenceManager.speed,
+                            pitch = preferenceManager.pitch,
+                            volume = preferenceManager.volume,
+                            isSsml = isSsml,
+                            engineName = engineName,
+                            locale = voice.locale
+                        )
+
                         Toast.makeText(requireContext(), R.string.synthesis_success, Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onError(error: String) {
+                    val ctx = context ?: return
                     activity?.runOnUiThread {
                         isSynthesizing = false
                         binding.btnSynthesize.text = getString(R.string.btn_synthesize)
                         binding.cardStatus.visibility = View.GONE
-                        Toast.makeText(requireContext(), getString(R.string.synthesis_failed, error), Toast.LENGTH_LONG).show()
+                        
+                        val isSsmlError = error.contains("1007") || 
+                                          error.contains("SSML", ignoreCase = true) || 
+                                          error.contains("FailedPrecondition", ignoreCase = true)
+
+                        if (isSsmlError) {
+                            com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+                                .setTitle(R.string.ssml_error_title)
+                                .setMessage(getString(R.string.ssml_error_message, error))
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                        } else {
+                            Toast.makeText(ctx, getString(R.string.synthesis_failed, error), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
         )
+    }
+
+    private fun hideKeyboard(view: View) {
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(view.windowToken, 0)
     }
 
     private fun stopSynthesis() {

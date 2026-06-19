@@ -1,9 +1,10 @@
-package com.utopiaxc.tts2
+package com.utopiaxc.tts2.activities.settings
 
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.utopiaxc.tts2.R
 import com.utopiaxc.tts2.databinding.ActivityAboutBinding
 
 class AboutActivity : AppCompatActivity() {

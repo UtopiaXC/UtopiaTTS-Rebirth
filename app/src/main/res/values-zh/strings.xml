@@ -15,7 +15,7 @@
     <string name="btn_preview">试听音色</string>
     <string name="preview_default_text">这是一个语音合成的范例。</string>
     
-    <string name="input_hint">在此输入要转换为语音的文字...</string>
+    <string name="input_hint">在此输入要转换为语音的文字</string>
     <string name="btn_synthesize">开始合成</string>
     
     <string name="btn_playing">播放中...</string>
@@ -31,7 +31,6 @@
     <string name="network_unavailable">网络未连接，请检查您的网络设置。</string>
     
     <string name="settings_about_title">关于</string>
-    <string name="settings_about_summary">版本 1.0.0</string>
     <string name="settings_credentials_title">密钥</string>
     <string name="credentials_reminder">提示：只有使用 Azure SDK 方式才需要添加。</string>
     <string name="about_description">UtopiaTTS是一款用于替代系统TTS引擎的软件，可用于一些第三方小说软件听书使用。</string>
@@ -58,4 +57,7 @@
     <string name="azure_config_saved">Azure SDK 配置已成功保存。</string>
     <string name="azure_config_empty">API 密钥和服务区域不能为空。</string>
     <string name="settings_system_settings">系统设置</string>
+    <string name="ssml_error_title">SSML 格式错误</string>
+    <string name="ssml_error_message">当前 SSML 内容不符合标准，请查看对应模型的相关文档。\n\n错误详情:\n%s</string>
+    <string name="ssml_ssml_mode">SSML 模式</string>
 </resources>

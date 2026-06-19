@@ -3,6 +3,7 @@ package com.utopiaxc.tts2.storage
 import android.content.Context
 import android.content.SharedPreferences
 import com.utopiaxc.tts2.engine.TtsEngineType
+import androidx.core.content.edit
 
 class PreferenceManager private constructor(context: Context) {
     companion object {
@@ -12,6 +13,8 @@ class PreferenceManager private constructor(context: Context) {
         private const val KEY_SPEED = "key_speed"
         private const val KEY_PITCH = "key_pitch"
         private const val KEY_VOLUME = "key_volume"
+        private const val KEY_MAX_HISTORY_COUNT = "key_max_history_count"
+        private const val KEY_MAX_CACHE_SIZE_MB = "key_max_cache_size_mb"
 
         @Volatile
         private var INSTANCE: PreferenceManager? = null
@@ -37,30 +40,45 @@ class PreferenceManager private constructor(context: Context) {
             }
         }
         set(value) {
-            sharedPreferences.edit().putString(KEY_ENGINE_TYPE, value.name).apply()
+            sharedPreferences.edit { putString(KEY_ENGINE_TYPE, value.name) }
         }
 
     var selectedVoiceId: String
         get() = sharedPreferences.getString(KEY_SELECTED_VOICE, "") ?: ""
         set(value) {
-            sharedPreferences.edit().putString(KEY_SELECTED_VOICE, value).apply()
+            sharedPreferences.edit { putString(KEY_SELECTED_VOICE, value) }
         }
 
     var speed: Float
         get() = sharedPreferences.getFloat(KEY_SPEED, 1.0f)
         set(value) {
-            sharedPreferences.edit().putFloat(KEY_SPEED, value).apply()
+            val rounded = Math.round(value * 10f) / 10f
+            sharedPreferences.edit { putFloat(KEY_SPEED, rounded) }
         }
 
     var pitch: Float
         get() = sharedPreferences.getFloat(KEY_PITCH, 1.0f)
         set(value) {
-            sharedPreferences.edit().putFloat(KEY_PITCH, value).apply()
+            val rounded = Math.round(value * 10f) / 10f
+            sharedPreferences.edit { putFloat(KEY_PITCH, rounded) }
         }
 
     var volume: Float
         get() = sharedPreferences.getFloat(KEY_VOLUME, 1.0f)
         set(value) {
-            sharedPreferences.edit().putFloat(KEY_VOLUME, value).apply()
+            val rounded = Math.round(value * 100f) / 100f
+            sharedPreferences.edit().putFloat(KEY_VOLUME, rounded).apply()
+        }
+
+    var maxHistoryCount: Int
+        get() = sharedPreferences.getInt(KEY_MAX_HISTORY_COUNT, 100)
+        set(value) {
+            sharedPreferences.edit { putInt(KEY_MAX_HISTORY_COUNT, value) }
+        }
+
+    var maxCacheSizeMb: Int
+        get() = sharedPreferences.getInt(KEY_MAX_CACHE_SIZE_MB, 100)
+        set(value) {
+            sharedPreferences.edit { putInt(KEY_MAX_CACHE_SIZE_MB, value) }
         }
 }

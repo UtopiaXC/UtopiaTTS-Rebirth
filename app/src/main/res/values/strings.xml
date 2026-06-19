@@ -15,7 +15,7 @@
     <string name="btn_preview">Preview Voice</string>
     <string name="preview_default_text">This is an example of speech synthesis.</string>
     
-    <string name="input_hint">Enter your text here to synthesize speech...</string>
+    <string name="input_hint">Enter your text here to synthesize speech</string>
     <string name="btn_synthesize">Synthesize to File</string>
     
     <string name="btn_playing">Playing...</string>
@@ -31,7 +31,6 @@
     <string name="network_unavailable">Network unavailable. Please check your connection.</string>
     
     <string name="settings_about_title">About</string>
-    <string name="settings_about_summary">Version 1.0.0</string>
     <string name="settings_credentials_title">Credentials</string>
     <string name="credentials_reminder">Note: Credentials are only required when using the Microsoft Azure SDK engine source.</string>
     <string name="about_description">UtopiaTTS is a software designed to replace the system\'s TTS engine and can be used for audiobook listening on some third-party novel reading apps.</string>
@@ -58,4 +57,7 @@
     <string name="azure_config_saved">Azure SDK configuration saved successfully.</string>
     <string name="azure_config_empty">API Key and Region cannot be empty.</string>
     <string name="settings_system_settings">System Settings</string>
+    <string name="ssml_error_title">SSML Format Error</string>
+    <string name="ssml_error_message">The current SSML content is invalid. Please check the documentation for the corresponding model.\n\nError details:\n%s</string>
+    <string name="ssml_ssml_mode">SSML Mode</string>
 </resources>

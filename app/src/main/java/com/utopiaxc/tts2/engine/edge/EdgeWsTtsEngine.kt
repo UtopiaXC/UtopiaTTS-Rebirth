@@ -24,6 +24,7 @@ class EdgeWsTtsEngine : ITtsEngine {
         pitch: Float,
         volume: Float,
         outputFormat: String,
+        isSsml: Boolean,
         callback: TtsSynthesisCallback
     ) {
         if (outputFormat == "raw-24khz-16bit-mono-pcm") {
@@ -34,10 +35,12 @@ class EdgeWsTtsEngine : ITtsEngine {
             wsClient.synthesize(
                 text,
                 voice.name,
+                voice.locale,
                 speed,
                 pitch,
                 volume,
                 "audio-24khz-48kbitrate-mono-mp3",
+                isSsml,
                 object : TtsSynthesisCallback {
                     override fun onStart() {
                         callback.onStart()
@@ -65,7 +68,7 @@ class EdgeWsTtsEngine : ITtsEngine {
                 }
             )
         } else {
-            wsClient.synthesize(text, voice.name, speed, pitch, volume, outputFormat, callback)
+            wsClient.synthesize(text, voice.name, voice.locale, speed, pitch, volume, outputFormat, isSsml, callback)
         }
     }
 

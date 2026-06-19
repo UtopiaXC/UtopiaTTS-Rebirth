@@ -5,7 +5,9 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="?android:attr/windowBackground">
+    android:background="?android:attr/windowBackground"
+    android:focusable="true"
+    android:focusableInTouchMode="true">
 
     <!-- Text Input Card -->
     <com.google.android.material.card.MaterialCardView
@@ -67,6 +69,32 @@
                 app:indicatorColor="@color/primary"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- SSML Toggle -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/ssml_ssml_mode"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary"/>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchSsml"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:useMaterialThemeColors="true"/>
+    </LinearLayout>
 
     <!-- Synthesize Trigger Button -->
     <com.google.android.material.button.MaterialButton

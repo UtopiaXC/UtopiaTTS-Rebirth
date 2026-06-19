@@ -219,15 +219,19 @@ class UtopiaTtsService : TextToSpeechService() {
     }
 
     override fun onSynthesizeText(request: SynthesisRequest, callback: SynthesisCallback) {
-        val text = request.charSequenceText?.toString() ?: ""
-        if (text.isBlank()) {
+        Log.d(TAG, "onSynthesizeText: req = ${request.charSequenceText}")
+        val rawText = request.charSequenceText?.toString() ?: ""
+        val text = cleanText(rawText)
+        if (text.isBlank() || text.none { it.isLetterOrDigit() }) {
             callback.start(24000, AudioFormat.ENCODING_PCM_16BIT, 1)
+            // Send 100ms of PCM silence to prevent reader apps from getting stuck on empty/punctuation-only segments
+            callback.audioAvailable(ByteArray(4800), 0, 4800)
             callback.done()
             return
         }
 
-        val speed = request.speechRate.toFloat() / 100f
-        val pitch = request.pitch.toFloat() / 100f
+        val speed = preferenceManager.speed
+        val pitch = preferenceManager.pitch
         val volume = preferenceManager.volume
 
         val reqLanguage = request.language
@@ -240,11 +244,23 @@ class UtopiaTtsService : TextToSpeechService() {
         }
 
         val voices = getAvailableVoices()
+        val selectedVoice = getSelectedVoice(voices)
         
-        var voice = if (!reqVoiceName.isNullOrEmpty()) {
-            voices.find { it.id == reqVoiceName }
-        } else {
-            null
+        var voice: VoiceInfo? = null
+
+        if (selectedVoice != null) {
+            if (reqLanguage.isNullOrEmpty()) {
+                voice = selectedVoice
+            } else {
+                val matchedLocale = getLocaleFromIso3(reqLanguage, reqCountry)
+                if (matchedLocale != null && selectedVoice.locale.startsWith(matchedLocale.language, ignoreCase = true)) {
+                    voice = selectedVoice
+                }
+            }
+        }
+
+        if (voice == null && !reqVoiceName.isNullOrEmpty()) {
+            voice = voices.find { it.id == reqVoiceName }
         }
 
         if (voice == null && !reqLanguage.isNullOrEmpty()) {
@@ -260,11 +276,7 @@ class UtopiaTtsService : TextToSpeechService() {
         }
 
         if (voice == null) {
-            voice = getSelectedVoice(voices)
-        }
-
-        if (voice == null) {
-            voice = getFallbackVoice(voices)
+            voice = selectedVoice ?: getFallbackVoice(voices)
         }
 
         if (voice == null) {
@@ -279,6 +291,9 @@ class UtopiaTtsService : TextToSpeechService() {
         activeQueue = queue
         val outputFormat = "raw-24khz-16bit-mono-pcm"
 
+        val isSsml = text.trim().startsWith("<speak", ignoreCase = true) || 
+                (text.trim().startsWith("<?xml") && text.contains("<speak", ignoreCase = true))
+
         ttsEngineManager.getCurrentEngine().synthesize(
             text = text,
             voice = voice,
@@ -286,6 +301,7 @@ class UtopiaTtsService : TextToSpeechService() {
             pitch = pitch,
             volume = volume,
             outputFormat = outputFormat,
+            isSsml = isSsml,
             callback = object : TtsSynthesisCallback {
                 override fun onStart() {
                     queue.offer(SynthesisEvent.Start)
@@ -367,12 +383,16 @@ class UtopiaTtsService : TextToSpeechService() {
                 }
                 is SynthesisEvent.Error -> {
                     Log.e(TAG, "Synthesis error: ${event.message}")
-                    if (isStarted) callback.error()
+                    callback.error()
                     running = false
                 }
             }
         }
         activeQueue = null
+    }
+
+    private fun cleanText(text: String): String {
+        return text.replace(Regex("[^\\p{L}\\p{N}\\s,\\.?!:;，。、？！：；…'-]"), "")
     }
 
     private fun getSelectedVoice(voices: List<VoiceInfo>): VoiceInfo? {

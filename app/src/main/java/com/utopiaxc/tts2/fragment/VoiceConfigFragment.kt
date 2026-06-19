@@ -58,7 +58,7 @@ class VoiceConfigFragment : Fragment() {
     }
 
     private fun setupEngineSpinner() {
-        val engines = listOf("Microsoft Edge WS", "Microsoft Azure SDK")
+        val engines = listOf("Microsoft TTS (Free)", "Microsoft TTS (Azure SDK)")
         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, engines)
         binding.autoEngine.setAdapter(adapter)
 
@@ -158,22 +158,31 @@ class VoiceConfigFragment : Fragment() {
     }
 
     private fun setupSliders() {
-        binding.sliderSpeed.value = preferenceManager.speed
-        updateSpeedLabel(preferenceManager.speed)
+        val savedSpeed = preferenceManager.speed
+        val roundedSpeed = Math.round(savedSpeed * 10f) / 10f
+        val finalSpeed = roundedSpeed.coerceIn(0.5f, 3.0f)
+        binding.sliderSpeed.value = finalSpeed
+        updateSpeedLabel(finalSpeed)
         binding.sliderSpeed.addOnChangeListener { _, value, _ ->
             preferenceManager.speed = value
             updateSpeedLabel(value)
         }
 
-        binding.sliderPitch.value = preferenceManager.pitch
-        updatePitchLabel(preferenceManager.pitch)
+        val savedPitch = preferenceManager.pitch
+        val roundedPitch = Math.round(savedPitch * 10f) / 10f
+        val finalPitch = roundedPitch.coerceIn(0.5f, 1.5f)
+        binding.sliderPitch.value = finalPitch
+        updatePitchLabel(finalPitch)
         binding.sliderPitch.addOnChangeListener { _, value, _ ->
             preferenceManager.pitch = value
             updatePitchLabel(value)
         }
 
-        binding.sliderVolume.value = preferenceManager.volume
-        updateVolumeLabel(preferenceManager.volume)
+        val savedVolume = preferenceManager.volume
+        val roundedVolume = Math.round(savedVolume * 100f) / 100f
+        val finalVolume = roundedVolume.coerceIn(0.0f, 1.0f)
+        binding.sliderVolume.value = finalVolume
+        updateVolumeLabel(finalVolume)
         binding.sliderVolume.addOnChangeListener { _, value, _ ->
             preferenceManager.volume = value
             updateVolumeLabel(value)
