@@ -1,6 +1,7 @@
 package com.utopiaxc.tts2.engine.edge
 
 import android.util.Log
+import com.utopiaxc.tts2.engine.SsmlUtils
 import com.utopiaxc.tts2.engine.callback.TtsSynthesisCallback
 import okhttp3.*
 import okio.ByteString
@@ -12,6 +13,7 @@ import java.util.concurrent.TimeUnit
 class EdgeWsClient {
     companion object {
         private const val TAG = "EdgeWsClient"
+        private const val MAX_CONNECT_ATTEMPTS = 2
         internal val client = OkHttpClient.Builder()
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
@@ -42,7 +44,12 @@ class EdgeWsClient {
     private var connectionState = ConnectionState.DISCONNECTED
     private var activeCallback: TtsSynthesisCallback? = null
     private var pendingRequest: PendingRequest? = null
+    @Volatile
     private var isStopped = false
+    @Volatile
+    private var hasNotifiedError = false
+    @Volatile
+    private var connectAttempt = 0
     private var idleTimer: Timer? = null
 
     fun synthesize(
@@ -59,6 +66,8 @@ class EdgeWsClient {
         synchronized(this) {
             cancelIdleTimeout()
             isStopped = false
+            hasNotifiedError = false
+            connectAttempt = 0
 
             activeCallback?.let {
                 Log.w(TAG, "Another synthesis was active. Cancelling it.")
@@ -93,6 +102,13 @@ class EdgeWsClient {
     }
 
     private fun connectWebSocket() {
+        try {
+            java.io.FileWriter(java.io.File("/sdcard/edge_ws_connect.txt")).use {
+                it.write("connectWebSocket called at ${System.currentTimeMillis()}\n")
+            }
+        } catch (_: Exception) {}
+        
+        connectAttempt++
         val connectionId = UUID.randomUUID().toString().replace("-", "").lowercase(Locale.US)
         val gecToken = EdgeDrm.generateSecMsGecHeader()
         
@@ -102,16 +118,22 @@ class EdgeWsClient {
                 "&Sec-MS-GEC=$gecToken" +
                 "&Sec-MS-GEC-Version=${EdgeConstants.SEC_MS_GEC_VERSION}"
         
-        Log.d(TAG, "Connecting to WebSocket URL: $wssUrl")
+        Log.w(TAG, "=== WSS DEBUG ===")
+        Log.w(TAG, "Connecting to WebSocket (attempt=$connectAttempt)")
+        Log.w(TAG, "WSS URL: $wssUrl")
         
         val request = Request.Builder()
             .url(wssUrl)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EdgeConstants.CHROMIUM_MAJOR_VERSION}.0.0.0 Safari/537.36 Edg/${EdgeConstants.CHROMIUM_MAJOR_VERSION}.0.0.0")
             .header("Pragma", "no-cache")
             .header("Cache-Control", "no-cache")
-            .header("Origin", "chrome-extension://jdiancpmjcobklbhgkeepaillocifjaf")
+            .header("Origin", "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold")
             .header("Cookie", "muid=${EdgeDrm.generateMuid()};")
+            .header("Accept-Encoding", "gzip, deflate, br, zstd")
+            .header("Accept-Language", "en-US,en;q=0.9")
             .build()
+        
+        Log.w(TAG, "Headers: ${request.headers}")
 
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -186,6 +208,25 @@ class EdgeWsClient {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                // 尝试从 403 响应的 Date 头计算时钟偏移并重试
+                if (response != null && response.code == 403 && connectAttempt < MAX_CONNECT_ATTEMPTS) {
+                    val dateStr = response.header("Date")
+                    if (!dateStr.isNullOrEmpty()) {
+                        val serverTime = parseServerDate(dateStr)
+                        if (serverTime != null) {
+                            EdgeDrm.adjustClockSkew(serverTime)
+                            Log.i(TAG, "403 Forbidden with Date header, retrying with corrected clock skew (attempt ${connectAttempt + 1}/$MAX_CONNECT_ATTEMPTS)")
+                            // 重试
+                            synchronized(this@EdgeWsClient) {
+                                activeWebSocket = null
+                                connectionState = ConnectionState.CONNECTING
+                            }
+                            connectWebSocket()
+                            return
+                        }
+                    }
+                }
+
                 val builder = StringBuilder()
                 builder.append("WebSocket failure: ").append(t.message).append("\n")
                 if (response != null) {
@@ -213,6 +254,7 @@ class EdgeWsClient {
                     activeWebSocket = null
                     connectionState = ConnectionState.DISCONNECTED
                     cancelIdleTimeout()
+                    hasNotifiedError = true
                     Pair(currentCb, currentPendingCb)
                 }
                 
@@ -231,7 +273,10 @@ class EdgeWsClient {
                     activeCallback = null
                     c
                 }
-                cb?.onError("WebSocket closed: code=$code, reason=$reason")
+                if (cb != null && !hasNotifiedError) {
+                    hasNotifiedError = true
+                    cb.onError("WebSocket closed: code=$code, reason=$reason")
+                }
                 try {
                     webSocket.close(1000, null)
                 } catch (e: Exception) {}
@@ -239,43 +284,15 @@ class EdgeWsClient {
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 Log.d(TAG, "WebSocket closed: code=$code, reason=$reason")
-                val cb = synchronized(this@EdgeWsClient) {
+                synchronized(this@EdgeWsClient) {
                     if (activeWebSocket === webSocket) {
                         activeWebSocket = null
                         connectionState = ConnectionState.DISCONNECTED
                     }
-                    val c = activeCallback
-                    activeCallback = null
-                    c
                 }
-                cb?.onError("WebSocket closed: code=$code, reason=$reason")
+                // 不重复回调 onError — onClosing 已经处理过
             }
         })
-    }
-
-    private fun sanitizeSsml(ssml: String, voiceName: String, locale: String): String {
-        var result = ssml.trim()
-        val speakIndex = result.indexOf("<speak", ignoreCase = true)
-        if (speakIndex != -1) {
-            val tagEndIndex = result.indexOf(">", speakIndex)
-            if (tagEndIndex != -1) {
-                val tagContent = result.substring(speakIndex, tagEndIndex)
-                if (!tagContent.contains("xml:lang", ignoreCase = true)) {
-                    val restOfSsml = result.substring(tagEndIndex + 1)
-                    result = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='$locale'>" + restOfSsml
-                }
-            }
-        }
-        val voiceRegex = Regex("(?i)<voice([^>]*)>")
-        result = voiceRegex.replace(result) { matchResult ->
-            val attrs = matchResult.groupValues[1]
-            if (!attrs.contains("name=", ignoreCase = true)) {
-                "<voice$attrs name=\"$voiceName\">"
-            } else {
-                matchResult.value
-            }
-        }
-        return result
     }
 
     private fun sendConfigAndSsml(webSocket: WebSocket, req: PendingRequest) {
@@ -292,25 +309,9 @@ class EdgeWsClient {
         val requestId = UUID.randomUUID().toString().replace("-", "").lowercase(Locale.US)
 
         val ssmlBody = if (req.isSsml) {
-            sanitizeSsml(req.text, req.voiceName, req.locale)
+            SsmlUtils.sanitizeSsml(req.text, req.voiceName, req.locale)
         } else {
-            val escapedText = escapeXml(req.text)
-            val ratePercent = Math.round((req.speed - 1.0f) * 100)
-            val rateStr = (if (ratePercent >= 0) "+" else "") + ratePercent.toString() + "%"
-            
-            val pitchPercent = Math.round((req.pitch - 1.0f) * 100)
-            val pitchStr = (if (pitchPercent >= 0) "+" else "") + pitchPercent.toString() + "%"
-            
-            val volumePercent = Math.round(req.volume * 100)
-            val volumeStr = volumePercent.toString() + "%"
-
-            "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${req.locale}'>" +
-                    "<voice name='${req.voiceName}'>" +
-                    "<prosody pitch='$pitchStr' rate='$rateStr' volume='$volumeStr'>" +
-                    escapedText +
-                    "</prosody>" +
-                    "</voice>" +
-                    "</speak>"
+            SsmlUtils.buildSsml(req.text, req.voiceName, req.locale, req.speed, req.pitch, req.volume)
         }
 
         val ssmlMsg = "X-RequestId:$requestId\r\n" +
@@ -371,11 +372,14 @@ class EdgeWsClient {
         return sdf.format(Date()) + " GMT+0000 (Coordinated Universal Time)"
     }
 
-    private fun escapeXml(s: String): String {
-        return s.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&apos;")
+    private fun parseServerDate(dateStr: String): Long? {
+        return try {
+            val sdf = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+            sdf.timeZone = TimeZone.getTimeZone("GMT")
+            sdf.parse(dateStr)?.let { it.time / 1000L }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse server date: $dateStr", e)
+            null
+        }
     }
 }

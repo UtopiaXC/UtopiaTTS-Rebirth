@@ -6,6 +6,7 @@ import com.utopiaxc.tts2.engine.edge.EdgeWsTtsEngine
 import com.utopiaxc.tts2.engine.callback.VoiceListCallback
 import com.utopiaxc.tts2.engine.model.VoiceInfo
 import com.utopiaxc.tts2.storage.PreferenceManager
+import java.util.concurrent.ConcurrentHashMap
 
 class TtsEngineManager private constructor(context: Context) {
     companion object {
@@ -26,7 +27,7 @@ class TtsEngineManager private constructor(context: Context) {
         TtsEngineType.EDGE_WS to EdgeWsTtsEngine(),
         TtsEngineType.AZURE_SDK to AzureSdkTtsEngine(context)
     )
-    private val voiceCache = mutableMapOf<TtsEngineType, List<VoiceInfo>>()
+    private val voiceCache: MutableMap<TtsEngineType, List<VoiceInfo>> = ConcurrentHashMap()
 
     fun getCurrentEngine(): ITtsEngine {
         val type = preferenceManager.engineType

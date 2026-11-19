@@ -15,7 +15,7 @@ object EdgeVoiceListApi {
     fun fetchVoiceList(callback: VoiceListCallback) {
         val request = Request.Builder()
             .url(EdgeConstants.VOICE_LIST_URL)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EdgeConstants.CHROMIUM_MAJOR_VERSION}.0.0.0 Safari/537.36 Edg/${EdgeConstants.CHROMIUM_MAJOR_VERSION}.0.0.0")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -32,11 +32,11 @@ object EdgeVoiceListApi {
                         val serverDate = sdf.parse(dateStr)
                         if (serverDate != null) {
                             val serverTimeSeconds = serverDate.time / 1000L
-                            val clientTimeSeconds = System.currentTimeMillis() / 1000L
-                            val skew = serverTimeSeconds - clientTimeSeconds
-                            EdgeDrm.clockSkewSeconds = skew
+                            EdgeDrm.adjustClockSkew(serverTimeSeconds)
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                        Log.w("EdgeVoiceListApi", "Failed to parse server date", e)
+                    }
                 }
 
                 if (!response.isSuccessful) {
